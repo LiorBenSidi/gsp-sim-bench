@@ -29,8 +29,15 @@ import id_dummy_2  # noqa: E402
 import id_dummy_3  # noqa: E402
 import server as grader  # noqa: E402
 from _progress import ticker  # noqa: E402
+from d2_hunt import (  # noqa: E402
+    StochRaiseSlot2Agent1,
+    ValueFloorStoch05Agent1,
+    ValueFloorStoch07Agent1,
+    ValueFloorStochAgent1,
+)
 
 from hw3.agent1 import BiddingAgent1  # noqa: E402  (currently strong07)
+from hw3.descent import StochRaiseAgent1  # noqa: E402
 
 
 class TruthfulAgent1:
@@ -74,12 +81,22 @@ def _make(factory, uid):
     return a
 
 
-# name -> zero-arg factory for the Agent-1 variant under test
+# name -> zero-arg factory for the Agent-1 variant under test. Three promising directions:
+#   (a) aggression sweep  -- bid = shade*value (the field-coupling insight: aggression suppresses)
+#   (b) value-floor family -- own-utility floor bid>=C*value ON TOP of the descend + cost-raise levers
+#   (c) stochastic-raise   -- the censoring-safe d2 cost-raise at the sign-definite FLOOR=0.4 / slot>=1
 VARIANTS = {
-    "strong07 (shipped)": BiddingAgent1,
-    "truthful  b=v":      lambda: TruthfulAgent1(1.0),
-    "aggr      b=0.95v":  lambda: TruthfulAgent1(0.95),
-    "aggr      b=0.90v":  lambda: TruthfulAgent1(0.90),
+    "strong07(shipped)":   BiddingAgent1,
+    "truthful b=1.00v":    lambda: TruthfulAgent1(1.00),
+    "aggr    b=0.95v":     lambda: TruthfulAgent1(0.95),
+    "aggr    b=0.90v":     lambda: TruthfulAgent1(0.90),
+    "aggr    b=0.85v":     lambda: TruthfulAgent1(0.85),
+    "aggr    b=0.80v":     lambda: TruthfulAgent1(0.80),
+    "valuefloor C=0.5":    ValueFloorStoch05Agent1,
+    "valuefloor C=0.6":    ValueFloorStochAgent1,
+    "valuefloor C=0.7":    ValueFloorStoch07Agent1,
+    "stochraise FLOOR0.4": StochRaiseAgent1,
+    "stochraise slot2":    StochRaiseSlot2Agent1,
 }
 DUMMIES = [id_dummy_1.BiddingAgent1, id_dummy_2.BiddingAgent1, id_dummy_3.BiddingAgent1]
 
