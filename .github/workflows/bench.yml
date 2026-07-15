@@ -1,0 +1,56 @@
+name: benchmark
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      n:
+        description: "Number of simulations (N) per benchmark"
+        default: "5000"
+        required: false
+
+# Two jobs run in parallel to halve wall-clock. Each prints its table to the log AND uploads it.
+# N is passed via env (never inlined into run:) so a crafted workflow_dispatch input can't inject shell.
+jobs:
+  variants:
+    name: "Agent-1 variant sweep (Task 1)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      N: ${{ github.event.inputs.n || '5000' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run benchmark_variants.py
+        run: |
+          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-5000}"
+          echo "== benchmark_variants.py N=$N_SAFE (aggression sweep vs strong07, Task 1) =="
+          PYTHONPATH=src python harness/benchmark_variants.py "$N_SAFE" | tee "variants_N${N_SAFE}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: variants-results
+          path: variants_*.txt
+
+  bothtasks:
+    name: "strong07 both tasks"
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      N: ${{ github.event.inputs.n || '5000' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run benchmark.py
+        run: |
+          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-5000}"
+          echo "== benchmark.py N=$N_SAFE (strong07 Task 1 + Task 2) =="
+          PYTHONPATH=src python harness/benchmark.py "$N_SAFE" | tee "benchmark_N${N_SAFE}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark_*.txt
