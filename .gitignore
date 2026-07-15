@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# submission_staging/ is the local build scratch, BUT the 3 FINAL submission artifacts are
+# committed (team decision 2026-07-11) so both partners always have the current bundle in-repo.
+# Real IDs are intentionally in-repo as a result (private repo, shared between the pair).
+submission_staging/*
+!submission_staging/123456789_987654321.zip
+!submission_staging/123456789_987654321.pdf
+!submission_staging/id_123456789_987654321.py
+
+# Local file holding the two IDs (used by the build); no need to track:
+.real_ids
+# Other students' submission files, dropped here for local head-to-head comparison
+# (harness/compare.py). They contain other people's IDs + strategy -- NEVER commit them:
+external_agents/
+harness/.sim_cache/

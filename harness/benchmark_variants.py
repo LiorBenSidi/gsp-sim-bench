@@ -43,7 +43,7 @@ class TruthfulAgent1:
     truthful bidding raises the price level and compresses everyone. A plain bid=value agent BEATS
     ALL THREE dummies (replica block 0, N=150: ours 39,798 > d2 36,123 > d1 34,279 > d3 31,698),
     where the distribution-EU best response (grabs cheap low slots, leaves d2 on top) LOSES d2.
-    A near-truthful reference field matches this truthful row. shade<1.0 sweeps the
+    a peer's reported field matches this truthful row -> he is near-truthful. shade<1.0 sweeps the
     aggression axis. Lives in the harness (NOT src/hw3) until it wins -- keeps the bundle clean.
     Stdlib, O(1), far under the 50 ms cap."""
 

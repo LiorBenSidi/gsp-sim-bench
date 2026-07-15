@@ -1,0 +1,28 @@
+[project]
+name = "ec-hw3-gsp-bidding-bot"
+version = "0.1.0"
+description = "HW3 GSP ad-auction bidding bot (GSP sim). Submission is stdlib-only."
+requires-python = ">=3.10"
+# No runtime dependencies on purpose: the graded submission must be Python stdlib only.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = ["fixtures", "submission_staging", "docs/explorations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C4", "UP"]
+ignore = ["E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# tests + harness are dev tooling: allow long lines and compact one-line timing/setup, and
+# the sys.path bootstrap before imports that driving the real server.py requires.
+"tests/**" = ["E501", "E702"]
+"harness/**" = ["E402", "E501", "E702"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "fixtures", "submission_staging"]

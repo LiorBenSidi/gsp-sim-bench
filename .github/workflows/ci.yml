@@ -1,0 +1,24 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Lint
+        run: ruff check .
+      - name: Security (report-only)
+        run: bandit -q -r src build || true
+      - name: Bundle stdlib-only check (placeholder ids)
+        run: PYTHONPATH=src python build/bundle.py --id1 123456789 --id2 987654321 --out /tmp/id_123456789_987654321.py
+      - name: Tests
+        run: PYTHONPATH=src pytest -q

@@ -1,0 +1,122 @@
+name: heavy-sims
+
+# MANUAL ONLY. Each run is a full local-equivalent field (e.g. benchmark.py 5000 = 15-40 min+),
+# which would be absurd on every push -- the per-push `ci` workflow stays light (pytest ~2s).
+# Trigger this from the Actions tab (Run workflow) to get a full run in the cloud without tying up
+# your machine. The harness is fixed-seed CRN, so the numbers are IDENTICAL to running the same
+# command locally; a slower cloud runner changes only wall-clock, never the result.
+#
+# To run replica AND real: just trigger this workflow TWICE -- once engine=replica (fast preview),
+# once engine=real (ground truth). They run as two INDEPENDENT, SEPARATE Actions runs (parallel),
+# each with its own live log + artifact; the replica numbers are byte-identical to the real ones
+# (proven by tests/System_Tests/test_replica_parity.py), so comparing the two is a scale check.
+on:
+  workflow_dispatch:
+    inputs:
+      harness:
+        description: "Heavy harness to run"
+        type: choice
+        options:
+          - benchmark
+          - tournament
+          - exp_valueaware
+        default: benchmark
+      num_sims:
+        description: "Number of simulations (a full local run = 5000)"
+        type: string
+        default: "5000"
+      va_mode:
+        description: "exp_valueaware only: which disjoint seed block / candidate set"
+        type: choice
+        options:
+          - holdout
+          - confirm
+          - screen
+          - pilot
+          - d1hunt
+          - d1hunt2
+          - d1holdout
+          - custom
+        default: holdout
+      engine:
+        description: "exp_valueaware only: real = grader (~hours), replica = byte-identical & fast. Trigger twice to run both."
+        type: choice
+        options:
+          - real
+          - replica
+        default: real
+      jobs:
+        description: "replica-only multiprocessing fan-out (cloud runner has 2 cores -> 2). Ignored for real."
+        type: string
+        default: "1"
+      cands:
+        description: "va_mode=custom only: comma-separated candidate list (e.g. descent,directd1005,csupp002)"
+        type: string
+        default: "descent"
+      block:
+        description: "va_mode=custom only: seed block (confirm=200000 / holdout=400000 / screen=0)"
+        type: choice
+        options:
+          - confirm
+          - holdout
+          - screen
+        default: confirm
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350   # under GitHub's 6h hard per-job cap
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # The harness is stdlib-only (like the submission) -- no pip install needed to run sims.
+      - name: Run heavy sim (fixed-seed CRN -> identical numbers to the same command run locally)
+        env:
+          H: ${{ inputs.harness }}
+          N: ${{ inputs.num_sims }}
+          VA: ${{ inputs.va_mode }}
+          ENGINE: ${{ inputs.engine }}
+          JOBS: ${{ inputs.jobs }}
+          HW3_CANDS: ${{ inputs.cands }}
+          HW3_BLOCK: ${{ inputs.block }}
+          RUN: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          # num_sims + jobs are free-form; they land in a filename + are parsed as ints. Reject
+          # anything but plain digits. harness/va_mode/engine are `choice` inputs -> constrained.
+          case "$N"    in ''|*[!0-9]*) echo "num_sims must be a positive integer, got: $N" >&2; exit 1 ;; esac
+          case "$JOBS" in ''|*[!0-9]*) echo "jobs must be a positive integer, got: $JOBS" >&2; exit 1 ;; esac
+          mkdir -p sim-results
+          # engine/jobs only apply to exp_valueaware (the only harness with the replica flag).
+          case "$H" in
+            benchmark)      LABEL="benchmark_N${N}";                     CMD=(harness/benchmark.py "$N") ;;
+            tournament)     LABEL="tournament_N${N}";                    CMD=(harness/tournament.py "$N") ;;
+            exp_valueaware) LABEL="exp_valueaware_${VA}_N${N}_${ENGINE}"; CMD=(harness/exp_valueaware.py "$VA" "$N" "$ENGINE" "$JOBS") ;;
+            *) echo "unknown harness: $H" >&2; exit 1 ;;
+          esac
+          OUT="sim-results/${LABEL}_run${RUN}.txt"
+          {
+            echo "harness=$H  num_sims=$N  va_mode=$VA  engine=$ENGINE"
+            echo "runner cores=$(nproc)  $(python -V)"
+            echo "fixed-seed CRN -> this output is identical to the same command run locally"
+            echo "----------------------------------------------------------------"
+          } | tee "$OUT"
+          START=$SECONDS
+          # -u = unbuffered, so the harness's stderr progress heartbeat streams into the live log.
+          PYTHONPATH=src python -u "${CMD[@]}" 2>&1 | tee -a "$OUT"
+          echo "----------------------------------------------------------------" | tee -a "$OUT"
+          echo "wall-clock: $(( (SECONDS - START) / 60 ))m $(( (SECONDS - START) % 60 ))s" | tee -a "$OUT"
+          {
+            echo "## Heavy sim result — \`$LABEL\`"
+            echo ""
+            echo '```'
+            cat "$OUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sim-results-${{ inputs.engine }}-run${{ github.run_number }}
+          path: sim-results/
+          retention-days: 30

@@ -1,10 +1,10 @@
 # gsp-sim-bench
 
-Reproducible benchmark harness for a repeated **Generalized Second-Price (GSP)** ad-auction
+Reproducible benchmark + test harness for a repeated **Generalized Second-Price (GSP)** ad-auction
 simulation. Compares bidding-agent strategies against three reference agents over a fixed, seeded
-set of games. Pure Python standard library — no dependencies.
+set of games. The submission agents are pure Python standard library — no runtime dependencies.
 
-## Run locally
+## Run the benchmarks locally
 
 ```bash
 # Agent-1 variant sweep (Task 1, no budget) — aggression sweep vs the current agent:
@@ -17,13 +17,24 @@ PYTHONPATH=src python harness/benchmark.py 5000
 `N` (the argument) is the number of independent games averaged; each game runs `T=3000` rounds with
 `4` agents and `4` slots. More `N` → tighter confidence intervals.
 
-## Run in CI
+## CI
 
-The `benchmark` GitHub Actions workflow runs both benchmarks in parallel and uploads the result
-tables as artifacts. Trigger it from the **Actions** tab (`Run workflow`), optionally setting `N`.
+- **`benchmark`** workflow — runs both benchmarks in parallel and uploads the result tables as
+  artifacts (trigger from the **Actions** tab, optional `N` input).
+- **`ci`** workflow — lint (ruff), a report-only security scan (bandit), a stdlib-only bundle check
+  with placeholder identifiers, and the full `pytest` suite.
+
+## Dev setup
+
+```bash
+pip install -r requirements.txt   # pytest, ruff, bandit (dev tooling only)
+PYTHONPATH=src pytest -q
+```
 
 ## Layout
 
 - `fixtures/` — the simulator (`server.py`), run constants, and the three reference agents.
 - `src/hw3/` — the agents under test (placeholder identifiers only).
-- `harness/` — the benchmark drivers.
+- `harness/` — benchmark drivers + strategy research modules.
+- `tests/` — unit / latency / system / regression suites.
+- `build/` — submission bundler (placeholder identifiers).
