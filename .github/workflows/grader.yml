@@ -1,0 +1,73 @@
+name: grader
+
+# Runs THE ACTUAL grader (fixtures/server.py) exactly as the TA will, unseeded, N=10000, BOTH modes.
+# ORDER: the FAST job runs first (statistical numbers, both tasks, ~40min); the TRUE (enforced) jobs
+# run AFTER it (needs: fast) -- one per task because ENFORCE_TIME_CAP=True is slower (measured ~4x
+# local; N=10000/task projects to ~3h on a hosted runner, split per task to sit well under the 6h
+# runner limit and the 350min timeout). Fast-mode and enforced-mode produce IDENTICAL sim
+# results (TA: "same simulation results, only the time-cap enforcement differs"); the enforced run
+# additionally proves NO disqualification at N=10000. Placeholder-id bundle (ids don't affect utility).
+#
+# ⚠️ A FRESH SESSION MUST FULLY VALIDATE THIS + bench.yml BEFORE RUNNING: confirm server.py globs the
+# bundle + 3 dummies (4 agents), CONSTANTS sed hits the right lines, grade_one.py reproduces server.py
+# main's per-task threshold check, and nothing conflicts with HW3 requirements. Do a tiny N=20 local/CI
+# dry-run of each path first.
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: "NUM_SIMULATIONS (both modes, both tasks)"
+        default: "10000"
+        required: false
+
+jobs:
+  fast:
+    name: "fast both tasks (N, fast mode)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 180  # N=10000 both tasks projects to ~90min on a hosted runner; margin for a slow runner
+    env:
+      N: ${{ github.event.inputs.n || '10000' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Real grader server.py, fast mode, both tasks
+        run: |
+          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-10000}"
+          mkdir -p run && cp fixtures/server.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_123456789_987654321.py run/
+          sed "s/NUM_SIMULATIONS = 10000/NUM_SIMULATIONS = ${N_SAFE}/" fixtures/CONSTANTS.py > run/CONSTANTS.py
+          cd run && python server.py | tee "../grader_fast_N${N_SAFE}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grader-fast
+          path: grader_fast_*.txt
+
+  true_task:
+    name: "true (enforced) task ${{ matrix.task }} (N)"
+    needs: [fast]
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [1, 2]
+    env:
+      N: ${{ github.event.inputs.n || '10000' }}
+      TASK: ${{ matrix.task }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Real grader (per task) ENFORCE_TIME_CAP=True
+        run: |
+          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-10000}"
+          T_SAFE="$(printf '%s' "$TASK" | tr -cd '12')"; T_SAFE="${T_SAFE:-1}"
+          mkdir -p run && cp fixtures/server.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_123456789_987654321.py grade_one.py run/
+          sed -e "s/NUM_SIMULATIONS = 10000/NUM_SIMULATIONS = ${N_SAFE}/" -e "s/ENFORCE_TIME_CAP = False/ENFORCE_TIME_CAP = True/" fixtures/CONSTANTS.py > run/CONSTANTS.py
+          cd run && python grade_one.py "$T_SAFE" | tee "../grader_true_task${T_SAFE}_N${N_SAFE}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: grader-true-task${{ matrix.task }}
+          path: grader_true_*.txt
