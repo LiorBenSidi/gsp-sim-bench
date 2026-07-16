@@ -82,22 +82,42 @@ def _make(factory, uid):
     return a
 
 
-# name -> zero-arg factory for the Agent-1 variant under test. Three promising directions:
-#   (a) aggression sweep  -- bid = shade*value (the field-coupling insight: aggression suppresses)
-#   (b) value-floor family -- own-utility floor bid>=C*value ON TOP of the descend + cost-raise levers
-#   (c) stochastic-raise   -- the censoring-safe d2 cost-raise at the sign-definite FLOOR=0.4 / slot>=1
+# Higher-FLOOR stochastic-raise ESCALATION -- the direct lever to WIDEN the d2 margin.
+# strong07 raises our slot-1 bid to FLOOR*v_lb when d2 sits in slot 0 above us, at FLOOR=0.7.
+# Pushing FLOOR up (0.8/0.9/1.0) makes d2 pay MORE for the top slot -> suppresses d2 harder ->
+# bigger margin. It stays SURGICAL (fires only vs an identified d2 in slot 0, ~7-15% of rounds),
+# so unlike pure truthful (which over-bids every round and collapsed own utility) it targets d2
+# specifically. FLOOR>0.4 can occasionally overtake d2 -- that is the aggression tradeoff we measure.
+class _StochF08(StochRaiseAgent1):
+    FLOOR = 0.8
+
+
+class _StochF09(StochRaiseAgent1):
+    FLOOR = 0.9
+
+
+class _StochF10(StochRaiseAgent1):
+    FLOOR = 1.0
+
+
+class _Slot2F09(StochRaiseSlot2Agent1):  # slot>=1 firing + strong FLOOR
+    FLOOR = 0.9
+
+
+# name -> zero-arg factory for the Agent-1 variant under test.
+#   value-floor family    -- own-utility floor bid>=C*value ON TOP of the descend + cost-raise levers
+#   stochastic-raise sweep -- the d2 cost-raise across FLOOR 0.4 (safe) -> 1.0 (max d2 suppression)
 VARIANTS = {
-    "strong07(shipped)":   BiddingAgent1,
-    "truthful b=1.00v":    lambda: TruthfulAgent1(1.00),
-    "aggr    b=0.95v":     lambda: TruthfulAgent1(0.95),
-    "aggr    b=0.90v":     lambda: TruthfulAgent1(0.90),
-    "aggr    b=0.85v":     lambda: TruthfulAgent1(0.85),
-    "aggr    b=0.80v":     lambda: TruthfulAgent1(0.80),
+    "strong07(shipped)":   BiddingAgent1,            # FLOOR=0.7 baseline (d2 +259)
     "valuefloor C=0.5":    ValueFloorStoch05Agent1,
     "valuefloor C=0.6":    ValueFloorStochAgent1,
     "valuefloor C=0.7":    ValueFloorStoch07Agent1,
     "stochraise FLOOR0.4": StochRaiseAgent1,
+    "stochraise FLOOR0.8": _StochF08,
+    "stochraise FLOOR0.9": _StochF09,
+    "stochraise FLOOR1.0": _StochF10,
     "stochraise slot2":    StochRaiseSlot2Agent1,
+    "slot2 FLOOR0.9":      _Slot2F09,
 }
 DUMMIES = [id_dummy_1.BiddingAgent1, id_dummy_2.BiddingAgent1, id_dummy_3.BiddingAgent1]
 
