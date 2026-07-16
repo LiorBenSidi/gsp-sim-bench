@@ -36,9 +36,21 @@ from d2_hunt import (  # noqa: E402
     ValueFloorStoch07Agent1,
     ValueFloorStochAgent1,
 )
+from replica_sim import run_simulation_replica  # noqa: E402
 
 from hw3.agent1 import BiddingAgent1  # noqa: E402  (currently strong07)
 from hw3.descent import StochRaiseAgent1  # noqa: E402
+
+# VC_ENGINE=replica uses the Task-1 replica (byte-identical to server.py per test_replica_parity,
+# ~100x faster) -- correct for this Task-1-only Agent-1 sweep and avoids the multi-hour real-server
+# runtimes that timed out. Default "real" keeps the exact grader for one-off confirmations.
+_ENGINE = os.environ.get("VC_ENGINE", "real").strip().lower()
+
+
+def _run_sim(field, num_slots, t):
+    if _ENGINE == "replica":
+        return run_simulation_replica(field, num_slots, t, enforce_budget=False)
+    return grader.run_simulation(field, num_slots, t, enforce_budget=False)
 
 
 class TruthfulAgent1:
@@ -129,7 +141,7 @@ def bench_task1(factory, n):
     tick = ticker(n, "task1")
     for s in range(n):
         random.seed(s)                                      # FIXED seeds -> reproducible
-        u = grader.run_simulation(field, CONSTANTS.NUM_SLOTS, CONSTANTS.T_ROUNDS, enforce_budget=False)
+        u = _run_sim(field, CONSTANTS.NUM_SLOTS, CONSTANTS.T_ROUNDS)
         for lab in labels:
             per[lab].append(u.get(lab, 0.0))
         tick(s + 1)
@@ -149,7 +161,7 @@ def main():
             sys.exit(1)
     print("HW3 Agent-1 VARIANT sweep -- Task 1 (no budget), real fixtures/server.py.")
     print(f"Config: seeds 0..{n - 1}; T={CONSTANTS.T_ROUNDS}; {CONSTANTS.NUM_SLOTS} agents/"
-          f"{CONSTANTS.NUM_SLOTS} slots; field = variant + id_dummy_1/2/3.\n")
+          f"{CONSTANTS.NUM_SLOTS} slots; engine={_ENGINE}; field = variant + id_dummy_1/2/3.\n")
     for name, factory in variants.items():
         rows = bench_task1(factory, n)
         ours = rows["ours"][0]
