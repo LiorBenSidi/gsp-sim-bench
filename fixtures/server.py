@@ -4,6 +4,7 @@ import glob
 import os
 import importlib.util
 import sys
+import time
 import concurrent.futures
 
 import CONSTANTS
@@ -79,13 +80,32 @@ def run_gsp_auction(bids, num_slots):
 
 def _invoke_with_timeout(executor, func, args, a_id, t, disqualified_this_sim, call_name):
     """
-    Runs func(*args) on the agent's dedicated single-thread executor, enforcing
-    CONSTANTS.TIME_CAP (applies to both get_bid and notify_round_results).
-    A timeout disqualifies the agent for the rest of this simulation; any other
-    exception is only logged, mirroring how get_bid already treats non-timeout
-    failures.
-    Returns (result, ok); ok is False if the call didn't produce a usable result.
+    Runs func(*args) under the CONSTANTS.TIME_CAP limit (applies to both get_bid
+    and notify_round_results).
+
+    ENFORCE_TIME_CAP=True (grading-like): the call runs on the agent's dedicated
+    single-thread executor. exceeding TIME_CAP disqualifies the agent for the
+    rest of this simulation.
+
+    ENFORCE_TIME_CAP=False (fast mode, for local strategy testing): the call is
+    made directly (~20x faster, identical simulation results). Overruns are
+    reported but NOT punished - run a final check with enforcement on before
+    submitting.
+
     """
+    if not CONSTANTS.ENFORCE_TIME_CAP:
+        start = time.perf_counter()
+        try:
+            result = func(*args)
+        except Exception as e:
+            print(f"Agent {a_id} raised an exception in {call_name} on round {t}: {e}.")
+            return None, False
+        elapsed = time.perf_counter() - start
+        if elapsed > CONSTANTS.TIME_CAP:
+            print(f"WARNING: Agent {a_id} took {elapsed*1000:.0f}ms in {call_name} on round {t} "
+                  f"(cap is {CONSTANTS.TIME_CAP*1000:.0f}ms) - this WOULD disqualify you in grading!")
+        return result, True
+
     future = executor.submit(func, *args)
     try:
         return future.result(timeout=CONSTANTS.TIME_CAP), True
@@ -180,6 +200,28 @@ def run_simulation(all_agents, num_slots, T, enforce_budget=False):
 
     return agent_utilities
 
+def print_threshold_check(task_label, avg_utils):
+    """
+    Prints, for every non-dummy agent, whether it meets the non-competitive
+    pass criterion: average utility >= (1 - PASS_TOLERANCE) of EACH dummy
+    agent's average utility.
+    """
+    dummies = {a: u for a, u in avg_utils.items() if a.startswith("dummy")}
+    students = {a: u for a, u in avg_utils.items() if not a.startswith("dummy")}
+    if not dummies or not students:
+        return
+
+    print(f"\n--- {task_label}: threshold check (non-competitive part, based on {CONSTANTS.NUM_SIMULATIONS} simulations) ---")
+    for s_id, s_u in students.items():
+        all_ok = True
+        for d_id, d_u in sorted(dummies.items()):
+            # sign-safe tolerance: threshold is PASS_TOLERANCE below the dummy's average
+            threshold = d_u - CONSTANTS.PASS_TOLERANCE * abs(d_u)
+            ok = s_u >= threshold
+            all_ok = all_ok and ok
+            print(f"  vs {d_id}: {s_u:12,.2f} vs {d_u:12,.2f} (need >= {threshold:12,.2f}) -> {'OK' if ok else 'BELOW'}")
+        print(f"  Agent {s_id}: {'PASSED' if all_ok else 'DID NOT PASS'} the {task_label} threshold check.")
+    
 def main():
     print("--- Loading Agents ---")
     
@@ -208,10 +250,13 @@ def main():
                 participation_count_t1[a_id] += 1
                 
         # Sort and print results
+        avg_utils_t1 = {}
         sorted_results_t1 = sorted(cumulative_utilities_t1.items(), key=lambda item: item[1] / max(1, participation_count_t1[item[0]]), reverse=True)
         for a_id, total_u in sorted_results_t1:
             avg_u = total_u / participation_count_t1[a_id] if participation_count_t1[a_id] > 0 else 0
+            avg_utils_t1[a_id] = avg_u
             print(f"Agent {a_id:<25} | Average Utility: {avg_u:8.2f} ")
+        print_threshold_check("Task 1", avg_utils_t1)
 
     if agents_task2:
         print("\nEvaluating Task 2 (Budget Constrained)...")
@@ -225,10 +270,13 @@ def main():
                 participation_count_t2[a_id] += 1
                 
         # Sort and print results
+        avg_utils_t2 = {}
         sorted_results_t2 = sorted(cumulative_utilities_t2.items(), key=lambda item: item[1] / max(1, participation_count_t2[item[0]]), reverse=True)
         for a_id, total_u in sorted_results_t2:
             avg_u = total_u / participation_count_t2[a_id] if participation_count_t2[a_id] > 0 else 0
+            avg_utils_t2[a_id] = avg_u
             print(f"Agent {a_id:<25} | Average Utility: {avg_u:8.2f}")
+        print_threshold_check("Task 2", avg_utils_t2)
 
 if __name__ == "__main__":
     main()

@@ -62,15 +62,35 @@ def show(title, rows):
         print(f"  {i:<5}{lab:<10}{m:>13.1f}{ci:>10.1f}{star}")
 
 
+def threshold_check(title, rows):
+    """Mirror server.py's print_threshold_check: full points if ours >= (1 - PASS_TOLERANCE) of
+    EACH dummy's average utility (the 2026-07-16 relief). Sign-safe threshold like the server."""
+    tol = getattr(CONSTANTS, "PASS_TOLERANCE", 0.05)
+    ours = rows["ours"][0]
+    print(f"\n  -- {title}: 95% threshold check (pass if ours >= {(1 - tol) * 100:.0f}% of each dummy) --")
+    all_ok = True
+    for d in ("dummy1", "dummy2", "dummy3"):
+        du = rows[d][0]
+        threshold = du - tol * abs(du)
+        ok = ours >= threshold
+        all_ok = all_ok and ok
+        ratio = (ours / du * 100) if du else float("inf")
+        print(f"     vs {d}: {ours:11,.1f} vs {du:11,.1f}  ({ratio:5.1f}%, need >= {threshold:11,.1f}) -> {'OK' if ok else 'BELOW'}")
+    print(f"     => {'PASSED' if all_ok else 'DID NOT PASS'} the {title} threshold (40-pt part).")
+    return all_ok
+
+
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 300
     print("HW3 reproducible benchmark -- exchange the OURS numbers to compare pairs.")
     print(f"Config: field = your agent + 3 dummies (4 agents/4 slots); seeds 0..{n - 1}; "
-          f"T={CONSTANTS.T_ROUNDS}; real fixtures/server.py.")
-    show(f"TASK 1  (no budget)  [{n} sims]",
-         bench(BiddingAgent1, [id_dummy_1.BiddingAgent1, id_dummy_2.BiddingAgent1, id_dummy_3.BiddingAgent1], False, n, "task1"))
-    show(f"TASK 2  (budget)     [{n} sims]",
-         bench(BiddingAgent2, [id_dummy_1.BiddingAgent2, id_dummy_2.BiddingAgent2, id_dummy_3.BiddingAgent2], True, n, "task2"))
+          f"T={CONSTANTS.T_ROUNDS}; real fixtures/server.py; ENFORCE_TIME_CAP={CONSTANTS.ENFORCE_TIME_CAP}.")
+    t1 = bench(BiddingAgent1, [id_dummy_1.BiddingAgent1, id_dummy_2.BiddingAgent1, id_dummy_3.BiddingAgent1], False, n, "task1")
+    show(f"TASK 1  (no budget)  [{n} sims]", t1)
+    threshold_check("Task 1", t1)
+    t2 = bench(BiddingAgent2, [id_dummy_1.BiddingAgent2, id_dummy_2.BiddingAgent2, id_dummy_3.BiddingAgent2], True, n, "task2")
+    show(f"TASK 2  (budget)     [{n} sims]", t2)
+    threshold_check("Task 2", t2)
 
 
 if __name__ == "__main__":

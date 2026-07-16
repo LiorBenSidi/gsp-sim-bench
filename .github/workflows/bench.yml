@@ -1,8 +1,9 @@
 name: benchmark
 
+# Manual-only (workflow_dispatch): with the 2026-07-16 fast-mode server the sweeps run locally in
+# minutes, so we no longer auto-fire on every push. Trigger from the Actions tab if a cloud run is
+# wanted.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       n:
