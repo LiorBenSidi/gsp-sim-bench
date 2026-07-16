@@ -1,0 +1,46 @@
+name: agent2
+
+# Agent 2 (Task 2, budget) MUST run on the real server (the replica is Task-1 only), which is
+# ~1.5-2h per variant at N=3000 -- hence the generous 5h timeout and manual (workflow_dispatch)
+# trigger, so it doesn't fire on every push. One parallel job per pacing cap.
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: "Number of simulations (N) per cap"
+        default: "3000"
+        required: false
+
+jobs:
+  pacing:
+    name: "agent2: ${{ matrix.slug }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {slug: cap15, key: "shipped (cap1.5)"}
+          - {slug: cap18, key: "cap 1.8"}
+          - {slug: cap20, key: "cap 2.0"}
+          - {slug: cap25, key: "cap 2.5"}
+          - {slug: cap30, key: "cap 3.0"}
+    env:
+      N: ${{ github.event.inputs.n || '3000' }}
+      VC_VARIANT: ${{ matrix.key }}
+      SLUG: ${{ matrix.slug }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run one pacing cap (Task 2, real server)
+        run: |
+          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-3000}"
+          SLUG_SAFE="$(printf '%s' "$SLUG" | tr -cd 'a-z0-9-')"; SLUG_SAFE="${SLUG_SAFE:-cap}"
+          echo "== agent2 '$VC_VARIANT'  N=$N_SAFE =="
+          PYTHONPATH=src python harness/benchmark_agent2.py "$N_SAFE" | tee "agent2_${SLUG_SAFE}_N${N_SAFE}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent2-${{ matrix.slug }}
+          path: agent2_*.txt

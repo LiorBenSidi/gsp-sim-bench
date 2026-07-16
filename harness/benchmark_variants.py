@@ -32,7 +32,6 @@ import server as grader  # noqa: E402
 from _progress import ticker  # noqa: E402
 from d2_hunt import (  # noqa: E402
     StochRaiseSlot2Agent1,
-    ValueFloorStoch05Agent1,
     ValueFloorStoch07Agent1,
     ValueFloorStochAgent1,
 )
@@ -116,20 +115,49 @@ class _Slot2F09(StochRaiseSlot2Agent1):  # slot>=1 firing + strong FLOOR
     FLOOR = 0.9
 
 
-# name -> zero-arg factory for the Agent-1 variant under test.
-#   value-floor family    -- own-utility floor bid>=C*value ON TOP of the descend + cost-raise levers
-#   stochastic-raise sweep -- the d2 cost-raise across FLOOR 0.4 (safe) -> 1.0 (max d2 suppression)
+# FINE VALUE-FLOOR sweep -- the ONLY direction that swept all 3 at N=3000 (C=0.7: d2 +128, d1 +134,
+# ours 38,207 > the peer's 36,638). Higher C (own-utility floor bid>=C*value) suppresses the field more
+# (d1 went from -396 at C=0.6 to +134 at C=0.7); pure truthful (C=1.0) collapses own utility and
+# loses. So the widest ROBUST margin lives somewhere in C in [0.70, 0.95]. This sweep pins it.
+class _VF072(ValueFloorStochAgent1):
+    C = 0.72
+
+
+class _VF075(ValueFloorStochAgent1):
+    C = 0.75
+
+
+class _VF078(ValueFloorStochAgent1):
+    C = 0.78
+
+
+class _VF080(ValueFloorStochAgent1):
+    C = 0.80
+
+
+class _VF085(ValueFloorStochAgent1):
+    C = 0.85
+
+
+class _VF090(ValueFloorStochAgent1):
+    C = 0.90
+
+
+class _VF095(ValueFloorStochAgent1):
+    C = 0.95
+
+
+# name -> zero-arg factory for the Agent-1 variant under test (fine value-floor C sweep).
 VARIANTS = {
-    "strong07(shipped)":   BiddingAgent1,            # FLOOR=0.7 baseline (d2 +259)
-    "valuefloor C=0.5":    ValueFloorStoch05Agent1,
-    "valuefloor C=0.6":    ValueFloorStochAgent1,
-    "valuefloor C=0.7":    ValueFloorStoch07Agent1,
-    "stochraise FLOOR0.4": StochRaiseAgent1,
-    "stochraise FLOOR0.8": _StochF08,
-    "stochraise FLOOR0.9": _StochF09,
-    "stochraise FLOOR1.0": _StochF10,
-    "stochraise slot2":    StochRaiseSlot2Agent1,
-    "slot2 FLOOR0.9":      _Slot2F09,
+    "strong07(shipped)": BiddingAgent1,          # baseline (loses d2 at N=3000)
+    "valuefloor C=0.70": ValueFloorStoch07Agent1,  # the N=3000 sweep winner so far
+    "valuefloor C=0.72": _VF072,
+    "valuefloor C=0.75": _VF075,
+    "valuefloor C=0.78": _VF078,
+    "valuefloor C=0.80": _VF080,
+    "valuefloor C=0.85": _VF085,
+    "valuefloor C=0.90": _VF090,
+    "valuefloor C=0.95": _VF095,
 }
 DUMMIES = [id_dummy_1.BiddingAgent1, id_dummy_2.BiddingAgent1, id_dummy_3.BiddingAgent1]
 

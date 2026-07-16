@@ -24,16 +24,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {slug: strong07,      key: "strong07(shipped)"}
-          - {slug: vfloor05,      key: "valuefloor C=0.5"}
-          - {slug: vfloor06,      key: "valuefloor C=0.6"}
-          - {slug: vfloor07,      key: "valuefloor C=0.7"}
-          - {slug: stoch-floor04, key: "stochraise FLOOR0.4"}
-          - {slug: stoch-floor08, key: "stochraise FLOOR0.8"}
-          - {slug: stoch-floor09, key: "stochraise FLOOR0.9"}
-          - {slug: stoch-floor10, key: "stochraise FLOOR1.0"}
-          - {slug: stoch-slot2,   key: "stochraise slot2"}
-          - {slug: slot2-floor09, key: "slot2 FLOOR0.9"}
+          - {slug: strong07, key: "strong07(shipped)"}
+          - {slug: vf070,    key: "valuefloor C=0.70"}
+          - {slug: vf072,    key: "valuefloor C=0.72"}
+          - {slug: vf075,    key: "valuefloor C=0.75"}
+          - {slug: vf078,    key: "valuefloor C=0.78"}
+          - {slug: vf080,    key: "valuefloor C=0.80"}
+          - {slug: vf085,    key: "valuefloor C=0.85"}
+          - {slug: vf090,    key: "valuefloor C=0.90"}
+          - {slug: vf095,    key: "valuefloor C=0.95"}
     env:
       N: ${{ github.event.inputs.n || '3000' }}
       VC_ENGINE: replica
