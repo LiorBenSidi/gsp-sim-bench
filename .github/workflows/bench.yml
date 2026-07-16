@@ -6,51 +6,46 @@ on:
   workflow_dispatch:
     inputs:
       n:
-        description: "Number of simulations (N) per benchmark"
+        description: "Number of simulations (N) per variant"
         default: "5000"
         required: false
 
-# Two jobs run in parallel to halve wall-clock. Each prints its table to the log AND uploads it.
-# N is passed via env (never inlined into run:) so a crafted workflow_dispatch input can't inject shell.
+# One PARALLEL job per Agent-1 variant (fixes the single-job timeout: 6 x N=5000 sequentially
+# exceeded 5.5h; each variant alone is ~15 min). Only the promising remainder after the N=5000
+# result -- strong07 (baseline) + the stochastic-raise + value-floor families. The aggression
+# sweep is dropped (it lost decisively at N=5000). VC_VARIANT / N / SLUG go via env (never inlined
+# into run:) so a crafted workflow_dispatch input can't inject shell.
 jobs:
   variants:
-    name: "Agent-1 variant sweep (Task 1)"
+    name: "variant: ${{ matrix.slug }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 330
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {slug: strong07,      key: "strong07(shipped)"}
+          - {slug: stoch-floor04, key: "stochraise FLOOR0.4"}
+          - {slug: stoch-slot2,   key: "stochraise slot2"}
+          - {slug: vfloor05,      key: "valuefloor C=0.5"}
+          - {slug: vfloor06,      key: "valuefloor C=0.6"}
+          - {slug: vfloor07,      key: "valuefloor C=0.7"}
     env:
       N: ${{ github.event.inputs.n || '5000' }}
+      VC_VARIANT: ${{ matrix.key }}
+      SLUG: ${{ matrix.slug }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run benchmark_variants.py
+      - name: Run one variant
         run: |
           N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-5000}"
-          echo "== benchmark_variants.py N=$N_SAFE (aggression sweep vs strong07, Task 1) =="
-          PYTHONPATH=src python harness/benchmark_variants.py "$N_SAFE" | tee "variants_N${N_SAFE}.txt"
+          SLUG_SAFE="$(printf '%s' "$SLUG" | tr -cd 'a-z0-9-')"; SLUG_SAFE="${SLUG_SAFE:-variant}"
+          echo "== variant '$VC_VARIANT'  N=$N_SAFE =="
+          PYTHONPATH=src python harness/benchmark_variants.py "$N_SAFE" | tee "variant_${SLUG_SAFE}_N${N_SAFE}.txt"
       - uses: actions/upload-artifact@v4
         with:
-          name: variants-results
-          path: variants_*.txt
-
-  bothtasks:
-    name: "strong07 both tasks"
-    runs-on: ubuntu-latest
-    timeout-minutes: 330
-    env:
-      N: ${{ github.event.inputs.n || '5000' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Run benchmark.py
-        run: |
-          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-5000}"
-          echo "== benchmark.py N=$N_SAFE (strong07 Task 1 + Task 2) =="
-          PYTHONPATH=src python harness/benchmark.py "$N_SAFE" | tee "benchmark_N${N_SAFE}.txt"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: benchmark_*.txt
+          name: variant-${{ matrix.slug }}
+          path: variant_*.txt

@@ -15,6 +15,7 @@ Task-2 numbers; this script only sweeps Agent 1.
 Usage: PYTHONPATH=src python harness/benchmark_variants.py [num_sims]   (default 300)
        Recommended: N=5000 for a tight, decision-grade read (95% CI ~ ±950 on absolute utility).
 """
+import os
 import random
 import statistics
 import sys
@@ -117,10 +118,19 @@ def bench_task1(factory, n):
 
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 300
+    # VC_VARIANT selects a single variant by key (used by the matrix workflow to parallelize
+    # one variant per job). Empty -> run the whole sweep sequentially (local use).
+    only = os.environ.get("VC_VARIANT", "").strip()
+    variants = VARIANTS
+    if only:
+        variants = {k: v for k, v in VARIANTS.items() if k == only}
+        if not variants:
+            print(f"unknown VC_VARIANT {only!r}; available: {list(VARIANTS)}")
+            sys.exit(1)
     print("HW3 Agent-1 VARIANT sweep -- Task 1 (no budget), real fixtures/server.py.")
     print(f"Config: seeds 0..{n - 1}; T={CONSTANTS.T_ROUNDS}; {CONSTANTS.NUM_SLOTS} agents/"
           f"{CONSTANTS.NUM_SLOTS} slots; field = variant + id_dummy_1/2/3.\n")
-    for name, factory in VARIANTS.items():
+    for name, factory in variants.items():
         rows = bench_task1(factory, n)
         ours = rows["ours"][0]
         beats_all = all(ours > rows[d][0] for d in ("dummy1", "dummy2", "dummy3"))
