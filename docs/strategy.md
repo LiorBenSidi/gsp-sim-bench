@@ -17,16 +17,20 @@ bids `{mean, mean − sd, mean + sd}`. We then choose the bid that maximizes *ex
 the joint product of those scenarios — comparing every reachable slot honestly against the **free
 bottom slot** (bid 0, pay nothing) and never targeting a negative-utility slot. Being
 distribution-aware is what tames the *random* bidder: we respond to its whole range instead of
-chasing whichever draw it happened to make last round. **Two targeted overrides against a constant
-rival** — a fixed-fraction bidder we can pin exactly, since the price of the slot above any non-top
-agent reveals its bid, so one observation identifies it. **(1) The descent:** when our
+chasing whichever draw it happened to make last round. **Three targeted overrides.** Against a
+*constant* rival — a fixed-fraction bidder we can pin exactly, since the price of the slot above any
+non-top agent reveals its bid, so one observation identifies it. **(1) The descent:** when our
 expected-utility-optimal seat is the *top* slot sitting directly above that constant rival, we
 evaluate dropping to *just below* it and take the descent only if it widens our expected margin
 versus that rival. **(2) The cost-raise:** when our best seat is instead *second*, directly *below*
-the constant rival, we raise our bid to just under its identified bid. In GSP our own price is set
-by whoever sits *below* us, so both moves make the constant rival pay near its full bid while our
-own price is untouched — its utility falls and our relative standing rises, and the cost-raise does
-so **without changing our seat at all** (we never overtake). We open value-anchored before any
+the constant rival, we raise our bid to just under its identified bid. Against the *stochastic*
+rival — which bids `u·v` with `u ∼ U(0.4, 1)` and so cannot be pinned to a point — **(3) a
+censoring-safe cost-raise:** its observed bids and the prices it pays lower-bound its scale `v_lb`,
+so when it sits directly above us in slot 1 we raise our bid toward `0.7·v_lb`. In GSP our own price
+is set by whoever sits *below* us, so all three moves make the rival above pay near its full bid
+while our own price is untouched — its utility falls and our relative standing rises; the constant
+cost-raise never overtakes (seat unchanged), while the stochastic one trades a little own-utility
+for a stronger hit on the hardest rival. We open value-anchored before any
 history and fall back to a point estimate when the field is large (guarding latency and the
 many-agent regime). (A value-agnostic suppression objective and several weightings were measured on
 a Common-Random-Numbers screen and rejected as over-suppressing; the targeted, type-gated descent
@@ -41,5 +45,5 @@ ahead on budget we press; when behind we retreat to cheaper slots — so spend s
 and the budget also caps every bid.
 
 **Robustness.** Strategies were selected on a Common-Random-Numbers tournament over the real
-grader (paired, many simulations) across both the 4-agent and many-agent fields — not the noisy
-30-sim default.
+grader (paired, many simulations) across both the 4-agent and many-agent fields — not a noisy
+small-sample run.
