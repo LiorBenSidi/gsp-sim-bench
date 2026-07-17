@@ -35,7 +35,7 @@ jobs:
       - name: Real grader server.py, fast mode, both tasks
         run: |
           N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-10000}"
-          mkdir -p run && cp fixtures/server.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_123456789_987654321.py run/
+          mkdir -p run && cp fixtures/server.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_207490913_318931672.py run/
           sed "s/NUM_SIMULATIONS = 10000/NUM_SIMULATIONS = ${N_SAFE}/" fixtures/CONSTANTS.py > run/CONSTANTS.py
           cd run && python server.py | tee "../grader_fast_N${N_SAFE}.txt"
       - uses: actions/upload-artifact@v4
@@ -64,7 +64,7 @@ jobs:
         run: |
           N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-10000}"
           T_SAFE="$(printf '%s' "$TASK" | tr -cd '12')"; T_SAFE="${T_SAFE:-1}"
-          mkdir -p run && cp fixtures/server.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_123456789_987654321.py grade_one.py run/
+          mkdir -p run && cp fixtures/server.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_207490913_318931672.py grade_one.py run/
           sed -e "s/NUM_SIMULATIONS = 10000/NUM_SIMULATIONS = ${N_SAFE}/" -e "s/ENFORCE_TIME_CAP = False/ENFORCE_TIME_CAP = True/" fixtures/CONSTANTS.py > run/CONSTANTS.py
           cd run && python grade_one.py "$T_SAFE" | tee "../grader_true_task${T_SAFE}_N${N_SAFE}.txt"
       - uses: actions/upload-artifact@v4
