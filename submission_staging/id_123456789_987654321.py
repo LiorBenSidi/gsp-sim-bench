@@ -27,7 +27,7 @@ def reconstruct_rivals(last_results, my_id, num_slots):
             rivals.append(occ_bid)
     return sorted(rivals, reverse=True)
 
-def best_response(value, ctr_list, rivals, budget, num_slots, raise_top=False, top_bid=None):
+def best_response(value, ctr_list, rivals, budget, num_slots):
     """Pick the profit-maximizing reachable slot and the minimum bid that SECURES it.
 
     rivals is sorted descending. To land in slot k you need exactly k rivals above you, so
@@ -36,32 +36,11 @@ def best_response(value, ctr_list, rivals, budget, num_slots, raise_top=False, t
     utility = (value - price)*CTR[k]; skip negative-utility slots (price > value). This
     compares every paid slot against the free floor honestly and never over-bids into a higher
     (more expensive) slot than the one chosen. Always returns a finite bid in [0, budget].
-
-    Cost-raise (`raise_top`) -- applied only when the profit-max slot is slot 1 (we sit right
-    below the slot-0 winner). In GSP the slot-0 winner pays the bid of whoever is directly below
-    it -- us -- so by bidding just under the winner's TRUE bid we force them to pay ~their full
-    bid for slot 0 while we keep our cheap slot-1 price (set by the agent below US). `top_bid` is
-    that identified true bid (the caller tracks each rival's exact bid across rounds: whenever an
-    agent sits in slot k>=1, the price of slot k-1 IS its bid; for a constant bidder like dummy1
-    this is exact after one observation). We then bid min(value, top_bid - eps) -- just under the
-    top, so we do NOT overtake and our own slot/price are untouched.
-
-    If `top_bid` is None (the slot-0 winner has never been seen outside slot 0 yet), we fall back
-    to min(value, rivals[0]); note rivals[0] is a SELF-REFERENTIAL estimate here (when we hold
-    slot 1, the slot-0 price we observe == our own prior bid), so the fallback tends to overtake.
-    The value cap keeps util >= 0 (any slot we land in has price <= our bid <= value).
-
-    Measured on the real server (paired CRN): the identified-top ('smart') form matches the
-    self-referential form's ranking gain over the OFF baseline (~+5347 rank-margin, 4-agent) while
-    recovering ~+765 of our own utility (the self-ref form overtook and cost us ~842). It raises
-    our rank vs the naive dummies, though the 4-agent ABSOLUTE standing stays a near-tie (value-
-    draw variance dominates) -- it does not guarantee first place. Kept OFF for Agent 2, which
-    already dominates Task 2 (raising there cost ~2% absolute for no relative gain).
     """
     if not ctr_list or value <= 0:
         return 0.0
     n = min(num_slots, len(ctr_list))
-    best_bid, best_u, best_k = (0.0, -1.0, None)
+    best_bid, best_u = (0.0, -1.0)
     for k in range(n):
         price = rivals[k] if k < len(rivals) else 0.0
         if price > value:
@@ -73,30 +52,15 @@ def best_response(value, ctr_list, rivals, budget, num_slots, raise_top=False, t
             bid = min(value, rivals[k] + _EPS)
         else:
             bid = 0.0
-        best_u, best_bid, best_k = (u, min(max(0.0, bid), budget), k)
+        best_u, best_bid = (u, min(max(0.0, bid), budget))
     if best_u < 0:
         return 0.0
-    if raise_top and best_k == 1 and rivals:
-        if top_bid is not None:
-            cap = min(value, max(0.0, float(top_bid) - _EPS))
-        else:
-            cap = min(value, rivals[0])
-        best_bid = max(best_bid, min(cap, budget))
     return float(best_bid)
 
-def choose_bid(value, ctr_list, num_slots, last_results, my_id, budget, num_agents=None, raise_top=False, top_bid=None):
-    """Best-respond to the reconstructed rival bids; guaranteed a finite float in [0, budget].
-
-    `raise_top` enables the slot-1 cost-raise on the slot-0 winner (see best_response). `top_bid`
-    is the caller's cross-round-identified true bid of that winner; when supplied we sit just
-    under it (no overtake), otherwise we fall back to the self-referential estimate.
-
-    (A regime-aware `barbell` variant for the everyone-wins field was measured on the CRN
-    tournament and REJECTED -- it lowered absolute utility and lost to dummy2 as well.
-    `num_agents` is accepted but unused, kept for a future regime split.)
-    """
+def choose_bid(value, ctr_list, num_slots, last_results, my_id, budget):
+    """Best-respond to the reconstructed rival bids; guaranteed a finite float in [0, budget]."""
     rivals = reconstruct_rivals(last_results, my_id, num_slots)
-    bid = best_response(value, ctr_list, rivals, budget, num_slots, raise_top=raise_top, top_bid=top_bid)
+    bid = best_response(value, ctr_list, rivals, budget, num_slots)
     if bid != bid or bid in (float('inf'), float('-inf')):
         return 0.0
     return float(bid)
@@ -328,7 +292,7 @@ class _MarginCore(_RobustCore):
         rids = [rid for rid, _p in pids]
         out = []
         for combo in _iproduct(*(p for _rid, p in pids)):
-            vec = sorted(zip(rids, combo, strict=True), key=lambda t: t[1], reverse=True)
+            vec = sorted(zip(rids, combo), key=lambda t: t[1], reverse=True)
             out.append((vec, wt))
         return out
 
@@ -581,30 +545,50 @@ class StochRaiseAgent1(DescentRaiseAgent1):
         return float(bid)
 
 class StochRaiseStrong07Agent1(StochRaiseAgent1):
-    """FLOOR=0.7 (dummy2's EXPECTED bid fraction): a stronger d2 cost-raise that removes more of
-    d2's utility but occasionally overtakes it (when d2's draw u < 0.7) -> NOT sign-definite; it
-    trades own-utility for extra d2 suppression. Measured (replica, holdout block 400000, T=3000):
-    significantly Pareto-improves DescentRaiseAgent1 on all three dummy margins (d1 +638, d2 +331,
-    d3 +198 at N=1000, each CRN paired CI excludes 0) with no absolute-utility regression."""
+    """FLOOR=0.7 -- the EXPECTED bid fraction of a U(0.4, 1.0) stochastic rival, rather than the
+    0.4 worst case. Raising to the expectation removes more of that rival's utility, at the cost of
+    occasionally overtaking it (whenever its draw falls below 0.7), so the suppression is no longer
+    sign-definite: it trades a little of our own utility for a stronger hit on the hardest rival."""
     FLOOR = 0.7
 
 
 # ===================== Task 1 -- BiddingAgent1 (no budget) =====================
 class BiddingAgent1(StochRaiseStrong07Agent1):
-    """Unconstrained GSP bidder: distribution-EU best response + targeted descend + d1 cost-raise +
-    censoring-safe d2 (stochastic-rival) cost-raise."""
+    """
+    Task 1: No Budget Constraint.
+
+    Unconstrained GSP bidder: distribution-EU best response + targeted descend + a cost-raise on an
+    identified constant rival + a censoring-safe cost-raise on an identified stochastic rival.
+    """
 
     def __init__(self):
         super().__init__(shade=0.85)
         self.id = '123456789_987654321'
 
     def start_simulation(self, num_agents, num_slots, CTR_list, value, total_budget, T):
+        """
+        Called once at the beginning of a T-round simulation.
+        """
         super().start_simulation(num_agents, num_slots, CTR_list, value, total_budget, T)
 
     def get_bid(self, current_budget_remaining):
+        """
+        Returns your bid for the current round.
+        """
         return super().get_bid(current_budget_remaining)
 
     def notify_round_results(self, round_results):
+        """
+        Called at the end of every round.
+        round_results is a list of tuples: (agent_id, slot_won, price_paid)
+        Only the results of the current round are provided, but you can keep track of
+        history if needed.
+        Only the agents that won in the current round will be included in round_results.
+        - slot_won=0 is the BEST slot (highest CTR = CTR_list[0])
+        - slot_won=3 is the WORST slot (lowest CTR = CTR_list[3])
+        - price_paid is the raw bid of the agent ranked just below the winner.
+        Actual cost = price_paid * CTR_list[slot_won].
+        """
         super().notify_round_results(round_results)
 
     def get_id(self):
@@ -613,8 +597,14 @@ class BiddingAgent1(StochRaiseStrong07Agent1):
 
 # ===================== Task 2 -- BiddingAgent2 (budget-constrained) =====================
 class BiddingAgent2:
-    """Budget-aware GSP bidder: the unconstrained best-response bid, modulated by how far
-    ahead/behind we are on budget vs. time."""
+    """
+    Task 2: With Budget Constraint.
+    Focus on pacing your bids to maximize utility over the entire T rounds
+    without running out of budget prematurely.
+
+    Budget-aware GSP bidder: the unconstrained best-response bid, modulated by how far
+    ahead/behind we are on budget vs. time.
+    """
 
     def __init__(self):
         self.id = '123456789_987654321'
@@ -626,6 +616,9 @@ class BiddingAgent2:
         self._round = 0
 
     def start_simulation(self, num_agents, num_slots, CTR_list, value, total_budget, T):
+        """
+        Called once at the beginning of a T-round simulation.
+        """
         self.num_agents = num_agents
         self.num_slots = num_slots
         self.CTR_list = list(CTR_list) if CTR_list else []
@@ -637,6 +630,9 @@ class BiddingAgent2:
         self._last_results = []
 
     def get_bid(self, current_budget_remaining):
+        """
+        Returns your bid for the current round.
+        """
         self._round += 1
         if not self.CTR_list or current_budget_remaining <= 0:
             return 0.0
@@ -655,6 +651,13 @@ class BiddingAgent2:
         return float(bid)
 
     def notify_round_results(self, round_results):
+        """
+        Called at the end of every round.
+        round_results is a list of tuples: (agent_id, slot_won, price_paid)
+        - slot_won=0 is the BEST slot (highest CTR = CTR_list[0])
+        - price_paid is the raw bid of the agent ranked just below the winner.
+        Actual cost = price_paid * CTR_list[slot_won].
+        """
         self._last_results = round_results if round_results else []
 
     def get_id(self):
