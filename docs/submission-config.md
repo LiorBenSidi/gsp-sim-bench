@@ -4,6 +4,22 @@ Single source of truth for **every** number in this repo (benchmarks, the a peer
 regression baseline, the replica screens). All of them are driven by the grader constants below, so
 any two runs that name the same block/N/engine are directly comparable.
 
+## Definitive grader result
+
+The vendored agent (`submission_staging/id_207490913_318931672.py`, sha256 `1d2f969c…`) run through
+the official `server.py` + `CONSTANTS.py` + 3 dummies (all sha256-pinned), unseeded, **N=10,000**.
+**Both tasks PASS all three per-dummy threshold checks:**
+
+| | ours | vs dummy_1 | vs dummy_2 | vs dummy_3 | verdict |
+|---|---|---|---|---|---|
+| **Task 1** | 39,594.69 | OK (102.9%) | OK (103.2%) | OK (115.5%) | **PASSED** |
+| **Task 2** | 67,036.17 | OK (122.7%) | OK (210.1%) | OK (161.7%) | **PASSED** |
+
+Pass criterion = **≥95% of each dummy** (`PASS_TOLERANCE=0.05`) — the relief exists because the
+grader run is unseeded, so it absorbs draw variance (SE ≈ ±340 at N=10,000). Ranking (1st/1st here)
+bears only on the competitive part. Zero latency warnings across ~60M `get_bid` calls. Grader run:
+Actions `29583647700`.
+
 ## Grader constants (`fixtures/CONSTANTS.py` — mirrors the official `CONSTANTS.py`)
 
 | constant | value | meaning |
@@ -22,8 +38,9 @@ any two runs that name the same block/N/engine are directly comparable.
 - **Field:** our agent + the 3 provided naive dummies → `num_agents == num_slots == 4`.
 - **Task 1** (`BiddingAgent1`): `enforce_budget=False` — no budget constraint.
 - **Task 2** (`BiddingAgent2`): `enforce_budget=True` — budget `B ~ N(10000,750)`.
-- **Grading (HW3.pdf p.3):** per agent, 40 pts for **beating each of the 3 dummies** on average
-  utility + 10 pts competitive vs the class.
+- **Grading (HW3.pdf p.3 + 2026-07-16 relief):** per agent, 40 pts for reaching **≥ 95% of each of
+  the 3 dummies** on average utility (`PASS_TOLERANCE=0.05` — the relief exists because the grader run
+  is unseeded; you do *not* have to strictly beat a dummy) + 10 pts competitive vs the class.
 
 ## What's shipped
 
