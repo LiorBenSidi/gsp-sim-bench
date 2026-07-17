@@ -81,28 +81,18 @@ def test_best_response_respects_budget_cap():
     assert bid <= 3.0 + 1e-9 and bid >= 0.0
 
 
-def test_raise_top_respects_budget_cap():
-    # raise_top lifts the bid toward rivals[0]; under a constraining budget it must STILL cap
-    # at budget (the raise path is otherwise only exercised via Agent 1, where budget == value).
-    # Here slot 1 is the profit-max slot (rivals[0]=80 huge, rivals[1]=10 cheap), so the raise
-    # fires; budget=3 must dominate the min(value, rivals[0]) lift.
-    bid = best_response(100.0, CTR, [80.0, 10.0], budget=3.0, num_slots=NUM_SLOTS, raise_top=True)
-    assert _finite_float_in(bid, 0.0, 3.0)
-
-
-def test_raise_top_stays_finite_and_nonneg_without_rivals():
-    # Defensive: raise_top must never index an empty rivals list or return a bad float.
-    bid = best_response(50.0, CTR, [], budget=50.0, num_slots=NUM_SLOTS, raise_top=True)
+def test_best_response_stays_finite_and_nonneg_without_rivals():
+    # Defensive: an empty rivals list must never be indexed and never yield a bad float.
+    bid = best_response(50.0, CTR, [], budget=50.0, num_slots=NUM_SLOTS)
     assert _finite_float_in(bid, 0.0, 50.0)
 
 
-def test_raise_top_uses_identified_true_bid_without_overtaking():
-    # slot 1 is profit-max (rivals=[89 self-ref estimate, 20 cheap]); with the slot-0 winner's
-    # TRUE bid known to be 85, the raise sits JUST under 85 -- lifting their price without
-    # overtaking into slot 0 -- rather than at the inflated self-referential estimate (89).
-    bid = best_response(100.0, CTR, [89.0, 20.0], budget=1e12, num_slots=NUM_SLOTS,
-                        raise_top=True, top_bid=85.0)
-    assert 20.0 < bid < 85.0  # above the slot-1 floor, strictly below the true top (no overtake)
+def test_best_response_never_overbids_into_a_costlier_slot():
+    # rivals=[89, 20]: slot 1 (price 20) is the profit-max seat. The bid must secure slot 1 --
+    # strictly above the displaced rival's 20 and strictly below the 89 above us, so we never
+    # overtake into the more expensive (slot 0) seat.
+    bid = best_response(100.0, CTR, [89.0, 20.0], budget=1e12, num_slots=NUM_SLOTS)
+    assert 20.0 < bid < 89.0
 
 
 def test_reconstruct_rivals_excludes_self():

@@ -4,8 +4,14 @@ from hw3.strategy import choose_bid
 
 
 class BiddingAgent2:
-    """Budget-aware GSP bidder: the unconstrained best-response bid, modulated by how far
-    ahead/behind we are on budget vs. time."""
+    """
+    Task 2: With Budget Constraint.
+    Focus on pacing your bids to maximize utility over the entire T rounds
+    without running out of budget prematurely.
+
+    Budget-aware GSP bidder: the unconstrained best-response bid, modulated by how far
+    ahead/behind we are on budget vs. time.
+    """
 
     def __init__(self):
         self.id = "123456789_987654321"  # placeholder; bundler injects real IDs at build
@@ -17,6 +23,12 @@ class BiddingAgent2:
         self._round = 0
 
     def start_simulation(self, num_agents, num_slots, CTR_list, value, total_budget, T):
+        """
+        Called once at the beginning of a T-round simulation.
+        """
+        # CTR_list[j] is the click-through rate for slot j.
+        # Slot 0 is the top position (highest CTR); slot -1 is the lowest.
+        # These values are fixed for the entire simulation.
         # Reset EVERY sim -- instance reused across simulations. Never raise.
         self.num_agents = num_agents
         self.num_slots = num_slots
@@ -29,6 +41,9 @@ class BiddingAgent2:
         self._last_results = []
 
     def get_bid(self, current_budget_remaining):
+        """
+        Returns your bid for the current round.
+        """
         self._round += 1
         if not self.CTR_list or current_budget_remaining <= 0:
             return 0.0
@@ -36,8 +51,6 @@ class BiddingAgent2:
         if not self._last_results:
             return min(self.value * 0.9, budget)
         # Ideal unconstrained bid, then pace it by budget-vs-time so spend is spread out.
-        # (No raise_top here: Task 2 already dominates, and cost-raising costs us ~2% absolute
-        # utility for no relative gain -- measured regression, so it stays off for Agent 2.)
         br = choose_bid(self.value, self.CTR_list, self.num_slots, self._last_results,
                         self.id, budget)
         rounds_left = max(1, self.T - self._round + 1)
@@ -52,6 +65,13 @@ class BiddingAgent2:
         return float(bid)
 
     def notify_round_results(self, round_results):
+        """
+        Called at the end of every round.
+        round_results is a list of tuples: (agent_id, slot_won, price_paid)
+        - slot_won=0 is the BEST slot (highest CTR = CTR_list[0])
+        - price_paid is the raw bid of the agent ranked just below the winner.
+        Actual cost = price_paid * CTR_list[slot_won].
+        """
         self._last_results = round_results if round_results else []
 
     def get_id(self):

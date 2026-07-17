@@ -254,7 +254,9 @@ class _MarginCore(_RobustCore):
         rids = [rid for rid, _p in pids]
         out = []
         for combo in _iproduct(*(p for _rid, p in pids)):
-            vec = sorted(zip(rids, combo, strict=True), key=lambda t: t[1], reverse=True)
+            # rids and combo always share length (combo = one bid per rid), so strict= is a no-op;
+            # plain zip() keeps behaviour identical while staying compatible with Python < 3.10.
+            vec = sorted(zip(rids, combo), key=lambda t: t[1], reverse=True)  # noqa: B905  (equal lengths; no strict= for py<3.10)
             out.append((vec, wt))
         return out
 
@@ -518,9 +520,8 @@ class StochRaiseAgent1(DescentRaiseAgent1):
 
 
 class StochRaiseStrong07Agent1(StochRaiseAgent1):
-    """FLOOR=0.7 (dummy2's EXPECTED bid fraction): a stronger d2 cost-raise that removes more of
-    d2's utility but occasionally overtakes it (when d2's draw u < 0.7) -> NOT sign-definite; it
-    trades own-utility for extra d2 suppression. Measured (replica, holdout block 400000, T=3000):
-    significantly Pareto-improves DescentRaiseAgent1 on all three dummy margins (d1 +638, d2 +331,
-    d3 +198 at N=1000, each CRN paired CI excludes 0) with no absolute-utility regression."""
+    """FLOOR=0.7 -- the EXPECTED bid fraction of a U(0.4, 1.0) stochastic rival, rather than the
+    0.4 worst case. Raising to the expectation removes more of that rival's utility, at the cost of
+    occasionally overtaking it (whenever its draw falls below 0.7), so the suppression is no longer
+    sign-definite: it trades a little of our own utility for a stronger hit on the hardest rival."""
     FLOOR = 0.7
