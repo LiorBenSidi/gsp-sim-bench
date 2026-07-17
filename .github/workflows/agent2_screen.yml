@@ -1,0 +1,48 @@
+name: agent2_screen
+
+# Agent-2 headroom screen: every candidate (aggression / value-cap / end-game / distribution-EU
+# variants of BiddingAgent2) plays the 3 Task-2 dummies over N seeded sims on the SAME disjoint
+# block (paired => block-luck-robust), reported as own mean utility. Multi-core per job.
+# 'shipped' is the baseline; a candidate is interesting only if it clearly beats shipped here AND
+# holds up on a fresh block. Download all candidate-* artifacts and compare.
+on:
+  workflow_dispatch:
+    inputs:
+      n:
+        description: "Sims per candidate"
+        default: "8000"
+        required: false
+      offset:
+        description: "Seed block offset (disjoint from 0)"
+        default: "100000"
+        required: false
+
+jobs:
+  screen:
+    name: "cand ${{ matrix.cand }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        cand: [shipped, pace20, pace30, vmult110, vmult125, vmult150, endgame, endgame_deep,
+               vmult110_pace30, vmult110_endgame, disteu, disteu_pace30]
+    env:
+      N: ${{ github.event.inputs.n || '8000' }}
+      OFF: ${{ github.event.inputs.offset || '100000' }}
+      CAND: ${{ matrix.cand }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run candidate
+        run: |
+          N_SAFE="$(printf '%s' "$N" | tr -cd '0-9')"; N_SAFE="${N_SAFE:-8000}"
+          O_SAFE="$(printf '%s' "$OFF" | tr -cd '0-9')"; O_SAFE="${O_SAFE:-100000}"
+          C_SAFE="$(printf '%s' "$CAND" | tr -cd 'a-z0-9_')"; C_SAFE="${C_SAFE:-shipped}"
+          python harness/agent2_candidates.py "$C_SAFE" "$N_SAFE" "$O_SAFE" | tee "cand_${C_SAFE}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-${{ matrix.cand }}
+          path: cand_*.json

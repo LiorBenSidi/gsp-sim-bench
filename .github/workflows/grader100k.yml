@@ -1,0 +1,57 @@
+name: grader100k
+
+# Apples-to-apples N=100,000-per-task comparison (both agents) vs a peer who ran at N=100,000.
+# N=100,000 in one job would exceed the 6h runner limit, so we SHARD: each task fans out to
+# `shards` parallel jobs of total_n/shards unseeded fast-mode sims. Summing the shards' per-agent
+# sums and dividing by total_n reproduces the single big-N mean exactly (independent samples).
+# Fast mode (ENFORCE_TIME_CAP=False in CONSTANTS) gives IDENTICAL numbers to the enforced/TRUE mode,
+# just faster. Download all shard-* artifacts and aggregate locally.
+#
+# Default 4 shards x 25,000 = 100,000/task; each shard ~1.5-2h (well under the 350min timeout).
+on:
+  workflow_dispatch:
+    inputs:
+      total_n:
+        description: "Total sims per task (summed across shards)"
+        default: "100000"
+        required: false
+      shards:
+        description: "Shards per task"
+        default: "4"
+        required: false
+
+jobs:
+  shard:
+    name: "task ${{ matrix.task }} shard ${{ matrix.shard }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [1, 2]
+        shard: [0, 1, 2, 3]
+    env:
+      TOTAL_N: ${{ github.event.inputs.total_n || '100000' }}
+      SHARDS: ${{ github.event.inputs.shards || '4' }}
+      TASK: ${{ matrix.task }}
+      SH: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run shard
+        run: |
+          TN="$(printf '%s' "$TOTAL_N" | tr -cd '0-9')"; TN="${TN:-100000}"
+          SC="$(printf '%s' "$SHARDS" | tr -cd '0-9')"; SC="${SC:-4}"; [ "$SC" -ge 1 ] || SC=4
+          T="$(printf '%s' "$TASK" | tr -cd '12')"; T="${T:-1}"
+          S="$(printf '%s' "$SH" | tr -cd '0-9')"; S="${S:-0}"
+          NSH=$(( TN / SC ))
+          SB=$(( S * 1000000 ))   # non-overlapping seed range per shard -> shards are INDEPENDENT samples
+          echo "task=$T shard=$S n_this_shard=$NSH seed_base=$SB (total_n=$TN over $SC shards)"
+          mkdir -p run && cp fixtures/server.py fixtures/CONSTANTS.py fixtures/id_dummy_1.py fixtures/id_dummy_2.py fixtures/id_dummy_3.py submission_staging/id_123456789_987654321.py grade_shard.py run/
+          cd run && python grade_shard.py "$T" "$NSH" "$SB" | tee "../shard_task${T}_${S}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-task${{ matrix.task }}-${{ matrix.shard }}
+          path: shard_task*.json
