@@ -5,7 +5,7 @@ The sims are embarrassingly parallel, so instead of running N sims sequentially 
 each call in a per-call threadpool -> slow), we fan the N sims across os.cpu_count() worker
 PROCESSES. Each worker runs a disjoint chunk with FRESH agents and a UNIQUE RNG seed, so the chunks
 are independent samples whose per-agent sums add up to the single big-N mean. `seed_base` offsets a
-shard's seeds so multiple shards never overlap; summing all shards' sums / total_n = the N-total mean.
+shard's seeds so shards never overlap; summing all shards' sums / total_n = the N-total mean.
 
 Run from a dir with server.py, CONSTANTS.py, id_dummy_1/2/3.py, and the agent bundle id_*.py.
 Usage: python grade_shard.py <task 1|2> <n_sims> [seed_base]
